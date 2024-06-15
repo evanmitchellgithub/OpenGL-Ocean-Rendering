@@ -1,0 +1,59 @@
+#version 330 core
+layout (location = 0) in vec3 vertex_position;
+layout (location = 1) in vec3 vertex_normal;
+layout (location = 2) in vec2 vertex_texture;
+layout (location = 3) in vec3 tangent_data;
+layout (location = 4) in vec3 bitangent_data;
+layout (location = 5) in vec2 normal_data;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec2 TexCoords;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 proj;
+
+uniform vec3 light_position; 
+uniform vec3 cameraPos; 
+uniform sampler2D wavesHeightMap;
+uniform sampler2D heightMap1;
+uniform sampler2D heightMap2;
+uniform float wavesOffset;
+uniform float interpolateFactor;
+
+void main()
+{ 
+    // Set scaling and dampening factors
+    float SCALE_FACTOR = 20.0;
+    float DAMPENING_FACTOR = 0.4;
+
+    // Calculate world position of vertex
+    vec4 worldPos = model * vec4(vertex_position.x * SCALE_FACTOR, vertex_position.y, vertex_position.z * SCALE_FACTOR, 1.0) ;//* model;
+    FragPos = vec3(worldPos.x, worldPos.y, worldPos.z- 0.01);
+
+    // Calculate texture coordinates
+    TexCoords = vertex_texture * SCALE_FACTOR/3;
+
+    // Calculate height of the plane based on texture data
+    float height1 = texture(heightMap1, vec2(TexCoords.x, TexCoords.y)).r;
+    float height2 = texture(heightMap2, vec2(TexCoords.x, TexCoords.y)).r;
+    float heightValue = texture(wavesHeightMap,vec2(TexCoords.x, TexCoords.y + wavesOffset)).r;
+    float heightMix = mix(height1, height2, interpolateFactor)*0.9;
+    float heightFinal = mix(heightMix, heightValue, 0.375);
+
+    //add waves to the plane
+    FragPos.y = heightFinal * 15.0;
+
+    // Apply dampening factor to the plane
+    float distanceFromOrigin = length(vec3(vertex_position.x * SCALE_FACTOR, vertex_position.y, vertex_position.z * SCALE_FACTOR));
+    float dampening = 1.0 / (1.0 + DAMPENING_FACTOR * distanceFromOrigin);
+    FragPos.y = FragPos.y * dampening;
+
+
+    Normal = mat3(transpose(inverse(model))) * vertex_normal; 
+
+    // Calculate final position of the vertex
+    gl_Position = proj * view * vec4(FragPos, 1.0);
+
+}
